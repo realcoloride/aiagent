@@ -1,0 +1,7 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
+    <Import Project="$(NuGetPackageRoot)whisper.net.runtime.cublas\1.5.0\build\Whisper.net.Runtime.Cublas.targets" Condition="Exists('$(NuGetPackageRoot)whisper.net.runtime.cublas\1.5.0\build\Whisper.net.Runtime.Cublas.targets')" />
+    <Import Project="$(NuGetPackageRoot)whisper.net.runtime\1.5.0\build\Whisper.net.Runtime.targets" Condition="Exists('$(NuGetPackageRoot)whisper.net.runtime\1.5.0\build\Whisper.net.Runtime.targets')" />
+  </ImportGroup>
+</Project>

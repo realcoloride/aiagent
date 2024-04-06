@@ -1,0 +1,16 @@
+C:\Users\Admin\Desktop\ai\aiagent\net6.0\runtimes\win-x64\whisper.dll
+C:\Users\Admin\Desktop\ai\aiagent\net6.0\runtimes\linux-x64\libwhisper.so
+C:\Users\Admin\Desktop\ai\aiagent\net6.0\runtimes\win-arm\whisper.dll
+C:\Users\Admin\Desktop\ai\aiagent\net6.0\runtimes\win-arm64\whisper.dll
+C:\Users\Admin\Desktop\ai\aiagent\net6.0\runtimes\win-x86\whisper.dll
+C:\Users\Admin\Desktop\ai\aiagent\net6.0\runtimes\macos-x64\libwhisper.dylib
+C:\Users\Admin\Desktop\ai\aiagent\net6.0\runtimes\macos-arm64\ggml-metal.metal
+C:\Users\Admin\Desktop\ai\aiagent\net6.0\runtimes\macos-arm64\libwhisper.dylib
+C:\Users\Admin\Desktop\ai\aiagent\net6.0\runtimes\linux-arm64\libwhisper.so
+C:\Users\Admin\Desktop\ai\aiagent\net6.0\runtimes\linux-arm\libwhisper.so
+C:\Users\Admin\Desktop\ai\aiagent\net6.0\ggml-metal.metal
+C:\Users\Admin\Desktop\ai\aiagent\net6.0\whisperserver.exe
+C:\Users\Admin\Desktop\ai\aiagent\net6.0\whisperserver.deps.json
+C:\Users\Admin\Desktop\ai\aiagent\net6.0\whisperserver.runtimeconfig.json
+C:\Users\Admin\Desktop\ai\aiagent\net6.0\whisperserver.dll
+C:\Users\Admin\Desktop\ai\aiagent\net6.0\whisperserver.pdb
