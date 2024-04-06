@@ -1,8 +1,5 @@
 ﻿using System.Net;
-using System.Text;
-using WebSocketSharp;
 using WebSocketSharp.Server;
-using Whisper.net;
 
 namespace whisperserver
 {
@@ -18,14 +15,6 @@ namespace whisperserver
         {
             WebSocketServer.AddWebSocketService<Processor>("/");
             WebSocketServer.Start();
-
-            while (true)
-            {
-                if (Processor.BufferQueue.Count == 0) continue;
-
-
-                Thread.Sleep(10);
-            }
         }
     }
 }

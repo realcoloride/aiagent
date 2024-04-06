@@ -1,7 +1,6 @@
 ﻿using System.Text;
 using WebSocketSharp;
 using WebSocketSharp.Server;
-using Whisper.net;
 
 namespace whisperserver
 {
@@ -11,9 +10,6 @@ namespace whisperserver
         private static int ReadInt32(byte[] data, int offset) => BitConverter.ToInt32(data, offset);
         private static short ReadInt16(byte[] data, int offset) => BitConverter.ToInt16(data, offset);
         private static byte ReadInt8(byte[] data, int offset) => data[offset];
-
-        // taskid : { userid, list of queued raw samples }
-        public static readonly Dictionary<short, Dictionary<string, List<byte[]>>> BufferQueue = new();
 
         public static float[] Convert16BitPCMToFloat32(byte[] pcmData)
         {
@@ -29,6 +25,14 @@ namespace whisperserver
             return floatData;
         }
 
+        public static string ProcessBuffer(byte[] pcmData)
+        {
+            float[] samples = Convert16BitPCMToFloat32(pcmData);
+            string? language = WhisperHelper.WhisperProcessor.DetectLanguage(samples);
+            Console.WriteLine("lang: " + language);
+            return "";
+        }
+
         protected override void OnMessage(MessageEventArgs e)
         {
             byte[] data = e.RawData;
@@ -40,10 +44,7 @@ namespace whisperserver
             short userCount = ReadInt16(data, 6);
 
             int offset = 4 + 2 + 2;
-
-            if (!BufferQueue.ContainsKey(taskId))
-                BufferQueue.Add(taskId, new());
-
+            
             for (int i = 0; i < userCount; i++)
             {
                 // user id length
@@ -62,13 +63,10 @@ namespace whisperserver
                 byte[] voiceBuffer = GetBytesBetween(data, offset, voiceBufferLength);
                 offset += voiceBufferLength;
 
-                if (!BufferQueue[taskId].ContainsKey(userId))
-                    BufferQueue[taskId].Add(userId, new());
-
-                BufferQueue[taskId][userId].Add(voiceBuffer);
+                ProcessBuffer(voiceBuffer);
             }
 
-            //Send("test");
+            // todo
         }
     }
 }
