@@ -102,7 +102,12 @@ function setupTTS() {
                     "path": sileroSessionPath
                 })
             })
-            .catch(error => { console.error(error); });
+            .catch(error => { 
+                console.error(error);
+
+                console.log("Silero server not present or failed.");
+                process.exit(-1);
+            });
 
             setInterval(() => {
                 // clear cache
