@@ -48,3 +48,9 @@ C:\Users\Admin\Desktop\ai\aiagent\whisperserver\obj\Debug\net6.0\refint\whispers
 C:\Users\Admin\Desktop\ai\aiagent\whisperserver\obj\Debug\net6.0\whisperserver.pdb
 C:\Users\Admin\Desktop\ai\aiagent\whisperserver\obj\Debug\net6.0\whisperserver.genruntimeconfig.cache
 C:\Users\Admin\Desktop\ai\aiagent\whisperserver\obj\Debug\net6.0\ref\whisperserver.dll
+C:\Users\Admin\Desktop\ai\aiagent\whisperserver\bin\Debug\net6.0\NAudio.dll
+C:\Users\Admin\Desktop\ai\aiagent\whisperserver\bin\Debug\net6.0\NAudio.Asio.dll
+C:\Users\Admin\Desktop\ai\aiagent\whisperserver\bin\Debug\net6.0\NAudio.Core.dll
+C:\Users\Admin\Desktop\ai\aiagent\whisperserver\bin\Debug\net6.0\NAudio.Midi.dll
+C:\Users\Admin\Desktop\ai\aiagent\whisperserver\bin\Debug\net6.0\NAudio.Wasapi.dll
+C:\Users\Admin\Desktop\ai\aiagent\whisperserver\bin\Debug\net6.0\NAudio.WinMM.dll

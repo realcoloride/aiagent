@@ -37,13 +37,13 @@ def process_buffer(voice_buffer):
     #    f.write(audio_np)
 
     #result = audio_model.transcribe(audio_np, beam_size=4, language="en")
-    #segments, info = audio_model.transcribe(audio_np, beam_size=4, language="en", vad_filter=True)
+    segments, info = audio_model.transcribe(audio_np, beam_size=4, language="en", vad_filter=True)
     
-    segments = audio_model.extract_text(audio_model.transcribe(audio_np))
+    #segments = audio_model.transcribe(audio_np, beam_size=5)
     dialogue = ""
 
-    #for segment in segments: dialogue += segment.text
-    for segment in segments: dialogue += segment
+    for segment in segments: dialogue += segment.text
+    #for segment in segments: dialogue += segment
 
     print(dialogue)
 
@@ -126,9 +126,9 @@ if not (isinstance(WEBSOCKET_SECRET, int) and 0 <= WEBSOCKET_SECRET < 2147483647
 
 print("loading speech to text model...")
 
-#audio_model = WhisperModel("distil-small.en", device="cuda", compute_type="float32")
+audio_model = WhisperModel("distil-small.en", device="cuda", compute_type="float32")
 #audio_model = whisper.load_model("medium", device="cuda")
-audio_model = Whisper('small')
+#audio_model = Whisper('small')
 
 print("model loaded!")
 

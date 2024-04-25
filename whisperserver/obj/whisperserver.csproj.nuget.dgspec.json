@@ -50,6 +50,10 @@
               "target": "Package",
               "version": "[3.0.0, )"
             },
+            "NAudio": {
+              "target": "Package",
+              "version": "[2.2.1, )"
+            },
             "WebSocketSharp-netstandard": {
               "target": "Package",
               "version": "[1.0.1, )"

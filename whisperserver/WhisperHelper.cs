@@ -1,5 +1,6 @@
 ﻿using Whisper.net;
 using Whisper.net.Ggml;
+using Whisper.net.Logger;
 
 namespace whisperserver
 {
@@ -24,7 +25,7 @@ namespace whisperserver
             Console.WriteLine("loading model");
 
             // load model
-            GgmlType ggmlType = GgmlType.Tiny;
+            GgmlType ggmlType = GgmlType.Base;
             string modelName = "ggml-base.bin";
 
             if (!File.Exists(modelName))
@@ -35,15 +36,26 @@ namespace whisperserver
                 await modelStream.CopyToAsync(fileWriter);
             }
 
+            LogProvider.Instance.OnLog += (level, message) =>
+            {
+                Console.Write($"{level}: {message}");
+            };
+
             using var whisperFactory = WhisperFactory.FromPath("ggml-base.bin");
 
             WhisperProcessor = whisperFactory.CreateBuilder()
-                .WithLanguage("en")
+                .WithLanguage("auto")
                 .Build();
 
             Console.WriteLine("done loading model");
-
-            // Open the file for reading
+            
+            /* test sample
+            
+            using var fileStream = File.OpenRead("../../../../temp/bush.wav");
+            await foreach (var result in WhisperProcessor.ProcessAsync(fileStream))
+            {
+                Console.WriteLine($"{result.Start}->{result.End}: {result.Text}");
+            }*/
         }
     }
 }

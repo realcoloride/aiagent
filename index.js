@@ -1,7 +1,7 @@
 // @(real)coloride - 2024
 
 // imports
-const { Client, Events, GatewayIntentBits, VoiceState } = require('discord.js');
+const { Client, Events, GatewayIntentBits, VoiceState, CDN } = require('discord.js');
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessages] });
 
 const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, createAudioResource, StreamType, NoSubscriberBehavior } = require('@discordjs/voice');
@@ -13,7 +13,7 @@ const { spawn } = require('child_process');
 const { PassThrough } = require('stream');
 const path = require('path');
 
-const Groq = require('groq-sdk')
+const Groq = require('groq-sdk');
 
 // dotenv
 require("dotenv").config();
@@ -31,7 +31,10 @@ const DISCORD_BOT_ADMIN_ID = getEnv("DISCORD_BOT_ADMIN_ID");
 const SPEAK_TIME_DURATION = getEnv("SPEAK_TIME_DURATION");
 const GROQ_API_KEY = getEnv("GROQ_API_KEY");
 
+const TTS_PROVIDER = getEnv("TTS_PROVIDER");
 const TTS_PIPER_MODEL = getEnv("TTS_PIPER_MODEL");
+const TTS_SILERO_ADDRESS = getEnv("TTS_SILERO_ADDRESS");
+const TTS_SILERO_SPEAKER = getEnv("TTS_SILERO_SPEAKER");
 
 const piperFolder = "piper";
 const piperVoicesFolder = "voices";
@@ -41,6 +44,7 @@ const piperVoicesFolder = "voices";
 
 /* ai */
 const groq = new Groq({apiKey: GROQ_API_KEY});
+
 async function sendToAI(connectionManager, dialogues) {
     // key   : member
     // value : dialogue
@@ -82,32 +86,82 @@ async function sendToAI(connectionManager, dialogues) {
 }
 
 // todo queue/not play if something already playing
-function playTTS(connectionManager, text) {
-    const piperModelPath = `${piperVoicesFolder}/${TTS_PIPER_MODEL}`;
-    const sampleRate = require(path.join(__dirname, `${piperModelPath}.json`))["audio"]["sample_rate"]; // 22050 for high
+let sileroSessionPath = `${__dirname}\\silero`.replace(/\\/g, '/');
 
-    let command = `echo ${text} | "${piperFolder}/piper.exe" -m "${piperModelPath}" --output_raw -q |`;
-                // this resamples from the sample rate of the voice model to 48khz (opus) 16 bit pcm
-                // then makes it stereo (or else it sounds sped up)
-       command += `ffmpeg -f s16le -ar ${sampleRate} -ac 1 -i pipe:0 -ar 48000 -ac 2 -f s16le -filter:a "pan=stereo|c0=c0|c1=c0" pipe:1 -loglevel quiet`;
-    
+function setupTTS() {
+    console.log("Setting up text to speech provider...");
+
+    switch (TTS_PROVIDER) {
+        case "SILERO":
+            // init session
+            fetch(`${TTS_SILERO_ADDRESS}/tts/session/`, {
+                headers: {
+                    "content-type": "application/json"
+                },
+                method: "POST",
+                body: JSON.stringify({
+                    "path": sileroSessionPath
+                })
+            })
+            .then(async(req)=>{console.log(req.status,req.statusText,await req.text())})
+            .catch(error => { console.error(error); });
+            break;
+        case "PIPER":
+            
+            break;
+    }
+}
+function playTTS(connectionManager, text) {
     const passthrough = new PassThrough();
     const audioResource = createAudioResource(passthrough, { inputType: StreamType.Raw });
 
-    const childProcess = spawn(command, {
-        shell: true,
-        stdio: ['ignore', 'pipe', 'ignore'] // ignore stdin, pipe stdout, ignore stderr
-    });
-    
-    // pipe through passthrough for streaming
-    childProcess.stdout.pipe(passthrough);
-    
-    // events
-    childProcess.on('error', (error) => {
-        console.error(`Error executing command: ${error}`);
-    });
+    switch (TTS_PROVIDER) {
+        case "SILERO":
+            fetch(`${TTS_SILERO_ADDRESS}/tts/generate/`, {
+                method: "POST",
+                headers: {
+                    "content-type":"application/json"
+                },
+                body: JSON.stringify({
+                    speaker : TTS_SILERO_SPEAKER,
+                    text,
+                    session : connectionManager.channel.id
+                })
+            }).then(async(request) => {
+                const response = await request.arrayBuffer();
+                const uint8Array = new Uint8Array(response);
+                const buffer = Buffer.from(uint8Array);
+
+                console.log(response.byteLength);
+                passthrough.write(buffer);
+            });
+            break;
+        case "PIPER":
+            const piperModelPath = `${piperVoicesFolder}/${TTS_PIPER_MODEL}`;
+            const sampleRate = require(path.join(__dirname, `${piperModelPath}.json`))["audio"]["sample_rate"]; // 22050 for high
+
+            let command = `echo ${text} | "${piperFolder}/piper.exe" -m "${piperModelPath}" --output_raw -q |`;
+                        // this resamples from the sample rate of the voice model to 48khz (opus) 16 bit pcm
+                        // then makes it stereo (or else it sounds sped up)
+            command += `ffmpeg -f s16le -ar ${sampleRate} -ac 1 -i pipe:0 -ar 48000 -ac 2 -f s16le -filter:a "pan=stereo|c0=c0|c1=c0" pipe:1 -loglevel quiet`;
+            
+            const childProcess = spawn(command, {
+                shell: true,
+                stdio: ['ignore', 'pipe', 'ignore'] // ignore stdin, pipe stdout, ignore stderr
+            });
+            
+            // pipe through passthrough for streaming
+            childProcess.stdout.pipe(passthrough);
+            
+            // events
+            childProcess.on('error', (error) => {
+                console.error(`Error executing command: ${error}`);
+            });
+            break;
+    }
 
     connectionManager.player.play(audioResource);
+
 }
 
 /* discord bot */
@@ -213,7 +267,7 @@ function subscribeToMember(connection, memberId) {
     });
 }
 function unsubscribeFromMember(connection, memberId) {
-    connections[connection].removeMember(memberId);
+    connections[connection]?.removeMember(memberId);
 }
 function processBuffers(connectionManager) {
     if (!connectionManager.hasTalkedAtleastOnce) return;
@@ -255,13 +309,13 @@ function processBuffers(connectionManager) {
 
     let offset = 0;
 
-    buffer.writeInt32LE(WEBSOCKET_SECRET, 0);
+    buffer.writeInt32BE(WEBSOCKET_SECRET, 0);
     offset += 4;
     
-    buffer.writeInt16LE(taskId, offset);
+    buffer.writeInt16BE(taskId, offset);
     offset += 2;
 
-    buffer.writeInt16LE(userCount, offset); // 16 -> 4 (32)
+    buffer.writeInt16BE(userCount, offset); // 16 -> 4 (32)
     offset += 2;
 
     for (let i = 0; i < userCount; i++) {
@@ -277,7 +331,7 @@ function processBuffers(connectionManager) {
         const voiceBuffer = data[memberId];
 
         // write byteslen
-        buffer.writeInt32LE(voiceBuffer.byteLength, offset);
+        buffer.writeInt32BE(voiceBuffer.byteLength, offset);
         offset += 4;
         
         buffer = Buffer.concat([buffer, data[memberId]]); // voiceBuffer
@@ -403,6 +457,7 @@ client.on(Events.MessageCreate, async message => {
     // leaving
     if (leaving) {
         connection?.destroy();
+        delete connections[connection];
         return;
     }
 
@@ -488,6 +543,17 @@ let ws;
 let connected;
 let websocketEventsRegistered;
 
+function whenWebsocketClosed() {
+    connected = false;
+    
+    /*for (let connection in Object.keys(connections)) {
+        connection?.destroy();
+        delete connections[connection];
+    }*/
+
+    console.log("Disconnected, retrying connection");
+    initializeWebSocket();
+}
 function registerWebsocketEvents() {
     if (websocketEventsRegistered) return;
     
@@ -499,17 +565,23 @@ function registerWebsocketEvents() {
     });
     ws.on('message', whenTaskFinished);
     ws.on('close', _ => {
-        connected = false;
-        console.log("Disconnected, retrying connection");
-        initializeWebSocket();
+        whenWebsocketClosed();
     });
+    ws.on('error', _ => {
+        whenWebsocketClosed();
+    })
 }
 function initializeWebSocket() {
     const address = `ws${(WEBSOCKET_ADDRESS.toLowerCase().startsWith("https") ? "s" : "")}://${WEBSOCKET_ADDRESS}:${WEBSOCKET_PORT}`;
 
     console.log(`Connecting to server: ${address}...`);
 
-    ws = new WebSocket(address);
+    try {
+        ws = new WebSocket(address);
+    } catch {
+        whenWebsocketClosed();
+    }
+    
     registerWebsocketEvents();
 }
 function sendData(data) {
@@ -526,4 +598,5 @@ if (typeof(WEBSOCKET_SECRET) != 'number' || WEBSOCKET_SECRET >= 2147483647 || WE
     return;
 }
 
+setupTTS();
 initializeWebSocket();

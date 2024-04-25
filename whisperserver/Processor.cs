@@ -27,9 +27,13 @@ namespace whisperserver
 
         public static string ProcessBuffer(byte[] pcmData)
         {
-            float[] samples = Convert16BitPCMToFloat32(pcmData);
-            string? language = WhisperHelper.WhisperProcessor.DetectLanguage(samples);
-            Console.WriteLine("lang: " + language);
+            float[] samples = new float[pcmData.Length];
+
+            File.WriteAllBytes("../../../../test.pcm", pcmData);
+
+            // MemoryStream stream = new(pcmData);
+                
+            //WhisperHelper.WhisperProcessor.Process(samples);
             return "";
         }
 
