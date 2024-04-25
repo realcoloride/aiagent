@@ -87,7 +87,6 @@ async function sendToAI(connectionManager, dialogues) {
 
 // todo queue/not play if something already playing
 let sileroSessionPath = `${__dirname}\\silero`.replace(/\\/g, '/');
-
 function setupTTS() {
     console.log("Setting up text to speech provider...");
 
@@ -103,17 +102,43 @@ function setupTTS() {
                     "path": sileroSessionPath
                 })
             })
-            .then(async(req)=>{console.log(req.status,req.statusText,await req.text())})
             .catch(error => { console.error(error); });
+
+            setInterval(() => {
+                // clear cache
+                fs.readdir(sileroSessionPath, (_, files) => {
+                    files.forEach(file => {
+                        const filePath = path.join(directoryPath, file);
+                        fs.unlink(filePath);
+                    });
+                });
+            }, 90000);
             break;
         case "PIPER":
             
             break;
     }
 }
+function pipeFfmpeg(command, passthrough) {
+    const childProcess = spawn(command, {
+        shell: true,
+        stdio: ['pipe', 'pipe', 'ignore'] // ignore stdin, pipe stdout, ignore stderr
+    });
+    
+    // pipe through passthrough for streaming
+    childProcess.stdout.pipe(passthrough);
+    
+    // events
+    childProcess.on('error', (error) => {
+        console.error(`Error executing command: ${error}`);
+    });
+
+    return childProcess;
+}
 function playTTS(connectionManager, text) {
     const passthrough = new PassThrough();
     const audioResource = createAudioResource(passthrough, { inputType: StreamType.Raw });
+    let command;
 
     switch (TTS_PROVIDER) {
         case "SILERO":
@@ -129,34 +154,28 @@ function playTTS(connectionManager, text) {
                 })
             }).then(async(request) => {
                 const response = await request.arrayBuffer();
-                const uint8Array = new Uint8Array(response);
-                const buffer = Buffer.from(uint8Array);
+                const buffer = Buffer.from(response);
 
-                console.log(response.byteLength);
-                passthrough.write(buffer);
+                // this resamples from the sample rate of the voice model to 48khz (opus) 16 bit pcm
+                // then makes it stereo (or else it sounds sped up)
+                command = `ffmpeg -f s16le -ar 48000 -ac 1 -i pipe:0 -ar 48000 -ac 2 -f s16le -filter:a "pan=stereo|c0=c0|c1=c0" pipe:1 -loglevel quiet`;
+
+                const ffmpeg = pipeFfmpeg(command, passthrough);
+                ffmpeg.stdin.write(buffer);
+                ffmpeg.stdin.end();
             });
+            
             break;
         case "PIPER":
             const piperModelPath = `${piperVoicesFolder}/${TTS_PIPER_MODEL}`;
             const sampleRate = require(path.join(__dirname, `${piperModelPath}.json`))["audio"]["sample_rate"]; // 22050 for high
 
-            let command = `echo ${text} | "${piperFolder}/piper.exe" -m "${piperModelPath}" --output_raw -q |`;
+            command = `echo ${text} | "${piperFolder}/piper.exe" -m "${piperModelPath}" --output_raw -q |`;
                         // this resamples from the sample rate of the voice model to 48khz (opus) 16 bit pcm
                         // then makes it stereo (or else it sounds sped up)
             command += `ffmpeg -f s16le -ar ${sampleRate} -ac 1 -i pipe:0 -ar 48000 -ac 2 -f s16le -filter:a "pan=stereo|c0=c0|c1=c0" pipe:1 -loglevel quiet`;
             
-            const childProcess = spawn(command, {
-                shell: true,
-                stdio: ['ignore', 'pipe', 'ignore'] // ignore stdin, pipe stdout, ignore stderr
-            });
-            
-            // pipe through passthrough for streaming
-            childProcess.stdout.pipe(passthrough);
-            
-            // events
-            childProcess.on('error', (error) => {
-                console.error(`Error executing command: ${error}`);
-            });
+            pipeFfmpeg(command, passthrough);
             break;
     }
 
