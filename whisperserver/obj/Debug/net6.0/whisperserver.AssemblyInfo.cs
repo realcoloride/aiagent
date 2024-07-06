@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("whisperserver")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1c6f416015cf099e790eb62c00afb65ade94eb4a")]
 [assembly: System.Reflection.AssemblyProductAttribute("whisperserver")]
 [assembly: System.Reflection.AssemblyTitleAttribute("whisperserver")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
