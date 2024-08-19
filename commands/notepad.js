@@ -1,7 +1,10 @@
 const fs = require('fs');
 const spawn = require('child_process').spawn;
 
-module.exports = (args) => {
+let timeout;
+module.exports = async(_, args) => {
+    clearTimeout(timeout);
+
     const filePath = './temp/᲼᲼᲼᲼᲼';
     fs.writeFileSync(filePath, args);
     spawn('notepad', [filePath], { stdio: 'inherit' });

@@ -76,7 +76,7 @@ async function sendToAI(connectionManager, dialogues) {
 
     for (const [_, object] of Object.entries(dialogues)) {
         const { displayName, username, dialogue } = object;
-        payload += `${displayName} (@${username}) says: ${dialogue}`;
+        payload += `${displayName} (@${username}) says: ${dialogue}\n`;
     }
     
     if (payload == "") return "";
@@ -116,33 +116,33 @@ function registerCommands() {
         commands[commandName] = require(path.join(commandsDir, file));
     });
 }
-function processCommand(regex, response, callback) {
-    let match = regex.exec(response);
+function processCommand(regex, response, callback, scheduledCallbacks) {
+    let match = regex.exec(response.toUpperCase());
 
     if (match) {
         const fullMatch = match[0];
+        const startIndex = response.toUpperCase().indexOf(fullMatch); 
         match.shift();
 
-        let index = -1;
-        match.forEach((value) => {
-            index++;
-            if (typeof value != 'string') return;
-            match[index] = value.replace(/^"|"$/g, '');
-        });
-        
-        // console.log(`Executing command ${commandName} with arguments: ${args}`);
-        callback(...match);
+        match = match.map((value) => typeof value === 'string' ? value.replace(/^"|"$/g, '') : value);
 
-        response = response.replace(fullMatch, /"(.)(.*)(.)"/).trim();
+        console.log("calling back with the following: ", match);
+        scheduledCallbacks.push({ callback, match });
+
+        response = response.replace(fullMatch, '').trim();
+        response = response.slice(0, startIndex) + response.slice(startIndex + fullMatch.length).trim();
+
+        console.log('RESPONSE:', response);
         return response;
     }
+
     return response;
 }
 
-function processCommands(response) {
+function processCommands(response, scheduledCallbacks) {
     for (const [commandName, callback] of Object.entries(commands)) {
-        const regexExp = new RegExp(`${commandName}\\s*\\((\"[^\"]*\"|'[^']*'|[^()]+)\\)`, "g");
-        response = processCommand(regexExp, response, callback);
+        const regexExp = new RegExp(`${commandName}\\s*\\((\"[^\"]*\"|'[^']*'|[^()]+)\\)`, "gi");
+        response = processCommand(regexExp, response, callback, scheduledCallbacks);
     }
 
     return response; 
@@ -228,7 +228,14 @@ function pipeFfmpeg(command, passthrough) {
 
     return childProcess;
 }
-async function playTTS(connectionManager, text) {
+function callScheduledCallbacks(scheduledCallbacks) {
+    scheduledCallbacks.forEach((callbackInformation) => {
+        const { callback, match } = callbackInformation;
+        callback(client, ...match);
+    });
+}
+
+async function playTTS(connectionManager, text, scheduledCallbacks) {
     const passthrough = new PassThrough();
     const audioResource = createAudioResource(passthrough, { inputType: StreamType.Raw });
     let command;
@@ -254,11 +261,16 @@ async function playTTS(connectionManager, text) {
 
             //(await new ElevenLabsClient().generate({output_format: '', })).on('')
 
+            ffmpeg.on('close', () => {
+                console.log("ffmpeg death");
+                callScheduledCallbacks(scheduledCallbacks);
+            });
+            console.log(audio.on)
             audio.on('close', () => {
                 console.log("finish talking");
-                ffmpeg.stdin.end();
+                /*ffmpeg.stdin.end();
+                ffmpeg.kill();*/
                 delete audio;
-                ffmpeg.kill();
                 
                 connectionManager.isSpeaking = false;
             });
@@ -319,11 +331,15 @@ async function playTTS(connectionManager, text) {
             const nodeReadableStream = Readable.fromWeb(response.body);
             nodeReadableStream.pipe(ffmpeg.stdin);
 
-            nodeReadableStream.on('end', () => {
+            ffmpeg.on('close', () => {
                 ffmpeg.stdin.end();
                 ffmpeg.kill();
+                delete nodeReadableStream;
+
                 connectionManager.isSpeaking = false;
-            })
+                callScheduledCallbacks(scheduledCallbacks);
+                console.log("stopped talking");
+            });
 
             break;
     }
@@ -465,7 +481,7 @@ function subscribeToMember(connection, memberId) {
     connectionManager.addMember(memberId);
 
     opusStream.on('data', (data) => {
-        if (connectionManager.isSpeaking) return;
+        //if (connectionManager.isSpeaking) return;
 
         // decode opus packet
         const decodedData = encoder.decode(data);
@@ -557,11 +573,15 @@ function processBuffers(connectionManager) {
         let response = await sendToAI(connectionManager, dialogues);
         if (response == "") return;
 
+        let scheduledCallbacks = [];
+
         response = cleanBeforeTTS(response);
-        response = processCommands(response);
+        response = processCommands(response, scheduledCallbacks);
         if (response.trim() == "") return;
 
-        playTTS(connectionManager, response);
+        playTTS(connectionManager, response, scheduledCallbacks);
+        
+        await connectionManager.channel.send(`_${response}_`);
     })();
 }
 
