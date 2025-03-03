@@ -1,5 +1,5 @@
-const fs = require('fs');
 const spawn = require('child_process').spawn;
+const fs = require('fs');
 
 let timeout;
 module.exports = async(_, args) => {

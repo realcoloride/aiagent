@@ -51,6 +51,13 @@ const TTS_ELEVENLABS_API_KEY = getEnv("TTS_ELEVENLABS_API_KEY");
 const TTS_ELEVENLABS_VOICE_NAME = getEnv("TTS_ELEVENLABS_VOICE_NAME");
 const TTS_ELEVENLABS_MODEL_NAME = getEnv("TTS_ELEVENLABS_MODEL_NAME");
 
+const TTS_VOICEMAKER_API_KEY = getEnv("TTS_VOICEMAKER_API_KEY");
+const TTS_VOICEMAKER_ENGINE = getEnv("TTS_VOICEMAKER_ENGINE");
+const TTS_VOICEMAKER_VOICE_ID = getEnv("TTS_VOICEMAKER_VOICE_ID");
+const TTS_VOICEMAKER_LANGUAGE_CODE = getEnv("TTS_VOICEMAKER_LANGUAGE_CODE");
+const TTS_VOICEMAKER_ACCENT_CODE = getEnv("TTS_VOICEMAKER_ACCENT_CODE");
+const TTS_VOICEMAKER_EFFECT = getEnv("TTS_VOICEMAKER_EFFECT");
+
 const piperFolder = "piper";
 const piperVoicesFolder = "voices";
 
@@ -240,6 +247,8 @@ async function playTTS(connectionManager, text, scheduledCallbacks) {
     const audioResource = createAudioResource(passthrough, { inputType: StreamType.Raw });
     let command;
     let ffmpeg;
+    let response;
+    let nodeReadableStream;
 
     switch (TTS_PROVIDER) {
         case "ELEVENLABS":
@@ -315,7 +324,7 @@ async function playTTS(connectionManager, text, scheduledCallbacks) {
         case "XTTS":
             
             //http://localhost:7851/api/tts-generate-streaming?text=${encodedText}&voice=${voice}&language=${language}&output_file=${outputFile}
-            const response = await fetch(`${TTS_ALLTALK_ADDRESS}/api/tts-generate-streaming?text=${encodeURIComponent(text)}&voice=${TTS_ALLTALK_VOICE_NAME}&language=${TTS_ALLTALK_LANGUAGE_NAME}&output_file=generated.wav`, {
+            response = await fetch(`${TTS_ALLTALK_ADDRESS}/api/tts-generate-streaming?text=${encodeURIComponent(text)}&voice=${TTS_ALLTALK_VOICE_NAME}&language=${TTS_ALLTALK_LANGUAGE_NAME}&output_file=generated.wav`, {
                 headers: { "content-type": "application/x-www-form-urlencoded" }
             });
             
@@ -328,7 +337,7 @@ async function playTTS(connectionManager, text, scheduledCallbacks) {
             command = `ffmpeg -f s16le -ar 22500 -ac 1 -i pipe:0 -ar 48000 -ac 2 -f s16le -filter:a "pan=stereo|c0=c0|c1=c0" pipe:1 -loglevel quiet`;
             ffmpeg = pipeFfmpeg(command, passthrough);
 
-            const nodeReadableStream = Readable.fromWeb(response.body);
+            nodeReadableStream = Readable.fromWeb(response.body);
             nodeReadableStream.pipe(ffmpeg.stdin);
 
             ffmpeg.on('close', () => {
@@ -340,6 +349,60 @@ async function playTTS(connectionManager, text, scheduledCallbacks) {
                 callScheduledCallbacks(scheduledCallbacks);
                 console.log("stopped talking");
             });
+
+            break;
+        case "VOICEMAKER":
+            const loweredAccentCode = TTS_VOICEMAKER_ACCENT_CODE.toLowerCase();
+            const payload = {
+                Engine: TTS_VOICEMAKER_ENGINE,
+                VoiceId: TTS_VOICEMAKER_VOICE_ID,
+                LanguageCode: TTS_VOICEMAKER_LANGUAGE_CODE,
+                AccentCode: TTS_VOICEMAKER_ACCENT_CODE,
+                Text: text, // `<${loweredAccentCode}>${text}<${loweredAccentCode}>`,
+                OutputFormat: "mp3", // wav
+                ResponseType: "stream",
+                SampleRate: "48000",
+                Effect: TTS_VOICEMAKER_EFFECT, // todo
+                // ProEngine: "turbo"
+                // MasterSettings: "advanced_v1" // for now this should be good enough
+            };
+
+            console.log(payload);
+            response = await fetch("https://developer.voicemaker.in/voice/api/", {
+                body: JSON.stringify(payload),
+                headers: { "Authorization" : `Bearer ${TTS_VOICEMAKER_API_KEY}`, "Content-Type": 'application/json' },
+                method: 'POST'
+            });
+            
+            if (!response.ok)
+                throw new Error(`Voicemaker API error: ${await response.text()}`);
+
+            connectionManager.isSpeaking = true;
+
+            // FFMPEG command to process the stream
+            command = 'ffmpeg -i pipe:0 -ac 2 -ar 48000 -acodec pcm_s16le -f s16le -filter:a "volume=2.0" pipe:1 -loglevel quiet';
+            ffmpeg = pipeFfmpeg(command, passthrough);
+
+            // Convert the response stream to a readable node stream
+            nodeReadableStream = Readable.fromWeb(response.body);
+
+            // Pipe the response stream to FFMPEG stdin
+            nodeReadableStream.pipe(ffmpeg.stdin);
+
+            /*
+            // Handle FFMPEG events
+            ffmpeg.on('close', () => {
+                connectionManager.isSpeaking = false;
+                callScheduledCallbacks(scheduledCallbacks);
+            });
+
+            // Handle the close event on the readable stream
+            nodeReadableStream.on('close', () => {
+                ffmpeg.stdin.end();
+                ffmpeg.kill();
+                connectionManager.isSpeaking = false;
+            });
+            */
 
             break;
     }
@@ -543,7 +606,8 @@ function processBuffers(connectionManager) {
             const text = await groq.audio.transcriptions.create({
                 file: stream,
                 response_format: "text",
-                model: "whisper-large-v3",
+                model: "whisper-large-v3-turbo",
+                language: 'fr'
             });
 
             stream.close();
